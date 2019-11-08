@@ -39,6 +39,28 @@ import bpy
 #            Operators            #
 # # # # # # # # # # # # # # # # # #
 
+class SetOrientationOperator(bpy.types.Operator):
+    bl_idname = "align.set_orientation"
+    bl_label = "Set Orientation"
+    bl_options = {'REGISTER', 'UNDO'}
+    
+    # Properties
+    inverse = bpy.props.BoolProperty(
+        name = "Inverse",
+        default = False,
+        description = "TODO"
+    )
+    
+    # Execute
+    def execute(self, context):
+        
+        obj_src = context.active_object
+        
+        if(self.inverse):
+            print("Bye")
+        else:
+            print("Hello World")
+        return {'FINISHED'}
 
 # # # # # # # # # # # # # # # # # #
 #             Panels              #
@@ -54,6 +76,7 @@ class OrientationPanel(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
         layout.label(text="Alignment tool test")
+        layout.operator(SetOrientationOperator.bl_idname)
 
 
 # # # # # # # # # # # # # # # # # #
@@ -64,6 +87,7 @@ classes = (
     # Properties
     
     # Operators
+    SetOrientationOperator,
     
     # Panels
     OrientationPanel,
