@@ -39,13 +39,28 @@ import bpy
 #            Operators            #
 # # # # # # # # # # # # # # # # # #
 
-class SetOrientationOperator(bpy.types.Operator):
-    bl_idname = "align.set_orientation"
-    bl_label = "Set Orientation"
+class SetOrientationToObjectOperator(bpy.types.Operator):
+    bl_idname = "align.set_orientation_to_object"
+    bl_label = "to object"
     bl_options = {'REGISTER', 'UNDO'}
     
     # Properties
-    inverse = bpy.props.BoolProperty(
+    
+    # Execute
+    def execute(self, context):
+        
+        obj_src = context.active_object
+        
+        print("Bye")
+        return {'FINISHED'}
+
+class SetOrientationToVerticesOperator(bpy.types.Operator):
+    bl_idname = "align.set_orientation_to_vertices"
+    bl_label = "to vertices"
+    bl_options = {'REGISTER', 'UNDO'}
+    
+    # Properties
+    inverse: bpy.props.BoolProperty(
         name = "Inverse",
         default = False,
         description = "TODO"
@@ -75,8 +90,8 @@ class OrientationPanel(bpy.types.Panel):
     
     def draw(self, context):
         layout = self.layout
-        layout.label(text="Alignment tool test")
-        layout.operator(SetOrientationOperator.bl_idname)
+        layout.operator(SetOrientationToObjectOperator.bl_idname)
+        layout.operator(SetOrientationToVerticesOperator.bl_idname)
 
 
 # # # # # # # # # # # # # # # # # #
@@ -87,7 +102,8 @@ classes = (
     # Properties
     
     # Operators
-    SetOrientationOperator,
+    SetOrientationToObjectOperator,
+    SetOrientationToVerticesOperator,
     
     # Panels
     OrientationPanel,
@@ -105,10 +121,10 @@ def register():
 def unregisert():
     
     # Delete Properties
-    for c in reversed(classes):
-        bpy.utils.unregister_class(c)
     
     # Unregister classes
+    for c in reversed(classes):
+        bpy.utils.unregister_class(c)
 
 if __name__ == "__main__":
     register()
