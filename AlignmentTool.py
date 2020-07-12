@@ -82,6 +82,7 @@ class SetOrientationToVerticesOperator(bpy.types.Operator):
         return False
     
     def execute(self, context):
+        
         return {'FINISHED'}
 
 class AlignToOrientationOperator(bpy.types.Operator):
@@ -100,21 +101,52 @@ class AlignToOrientationOperator(bpy.types.Operator):
         return {'FINISHED'}
 
 class AlignToObjectOperator(bpy.types.Operator):
-    """Coming Soon: Align selected objects to active object"""
+    """Align selected objects to active object"""
     bl_idname = "align.align_to_object"
     bl_label = "to active object"
     bl_options = {'REGISTER', 'UNDO'}
     
     # Properties
     
+    move: bpy.props.BoolProperty(
+        name = "Move",
+        default = True,
+        description = "Move the object to active object"
+    )
+    
     # Methods
     @classmethod
     def poll(cls, context):
-        return context.active_object is not None and False
+        return context.active_object is not None and (
+            len(context.selected_objects) > 1 or (
+                len(context.selected_objects) == 1 and
+                not context.active_object.select_get()
+            )
+        )
     
     def execute(self, context):
         
+        # Store and set modes
+        obj = context.active_object
+        mode = obj.mode
+        bpy.ops.object.mode_set(mode='OBJECT')
+        selected = obj.select_get()
+        
+        # Set orientation to active object
+        bpy.ops.align.set_orientation_to_object()
+        
+        # Align selected objects
+        obj.select_set(False)
         bpy.ops.transform.transform(mode='ALIGN')
+        
+        # Move selected objects
+        if(self.move):
+            for selected_obj in context.selected_objects:
+                selected_obj.location = obj.location
+                
+        # Reset modes
+        obj.select_set(selected)
+        bpy.ops.object.mode_set(mode=mode)
         
         return {'FINISHED'}
 
@@ -203,7 +235,7 @@ class AlignToVerticesOperator(bpy.types.Operator):
                 [vector_x[0], vector_y[0], vector_z[0]],
                 [vector_x[1], vector_y[1], vector_z[1]],
                 [vector_x[2], vector_y[2], vector_z[2]]
-            ])
+            ]) 
         
         # Reset selection mode
         use_extend = False
