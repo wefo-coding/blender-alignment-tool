@@ -8,7 +8,7 @@ Align the transformation axes to the active object.
 With this function you create a transformation orientation called 'Align' aligned to the active object. 
 
 ### Orientation to vertices
-Coming soon: Align the transformation axes to the selected vertices.
+Align the transformation axes to the selected vertices.
 
 ### Align to orientation
 Align selected objects.
@@ -16,7 +16,7 @@ Align selected objects.
 With this function you align all selected objects to the selected transform orientation.
 
 ### Align to active object
-Coming Soon: Align selected objects to active object.
+Align selected objects to active object.
 
 ### Align to vertices
 Align selected objects to selected vertices of the active object.
