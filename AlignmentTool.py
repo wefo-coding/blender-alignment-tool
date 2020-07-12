@@ -8,7 +8,7 @@ bl_info = {
     "name": "Alignment Tool",
     "description": "Tool for aligning objects and profiles in Blender.",
     "author": "Florian Otten",
-    "version": (0, 3),
+    "version": (0, 4),
     "blender": (2, 82, 0),
     "location": "3D View > Tools",
     "warning": "",
@@ -63,8 +63,9 @@ class SetOrientationToObjectOperator(bpy.types.Operator):
         bpy.ops.transform.create_orientation(name = "Align", use = True, overwrite = True)
         return {'FINISHED'}
 
+#ToDo: Copied from align_to_vertices. Create a function to avoid duplicated code
 class SetOrientationToVerticesOperator(bpy.types.Operator):
-    """Coming soon: Align the transformation axes to the selected vertices"""
+    """Align the transformation axes to the selected vertices"""
     bl_idname = "align.set_orientation_to_vertices"
     bl_label = "to vertices"
     bl_options = {'REGISTER', 'UNDO'}
@@ -76,14 +77,106 @@ class SetOrientationToVerticesOperator(bpy.types.Operator):
         description = "Inverse the alignment of the Z-axis"
     )
     
+    # Properties
+    select: bpy.props.BoolProperty(
+        name = "Select Orientation",
+        default = True,
+        description = "Set transformation orientation to 'Align'"
+    )
+    
     # Methods
     @classmethod
     def poll(cls, context):
-        return False
+        return (
+            context.active_object is not None and
+            context.active_object.type == 'MESH'
+        )
     
     def execute(self, context):
         
-        return {'FINISHED'}
+        error_msg = ""
+        
+        # Store and set modes
+        obj = context.active_object
+        mode = obj.mode
+        bpy.ops.object.mode_set(mode='EDIT')
+        selection_mode = context.tool_settings.mesh_select_mode
+        bpy.ops.mesh.select_mode(type='VERT', action='ENABLE')
+        selected = obj.select_get()
+        orientation = context.scene.transform_orientation_slots[0].type
+        
+        # Get orientation matrix
+        bm = bmesh.from_edit_mesh(obj.data)
+        
+        if(len(bm.select_history) != 3):
+            error_msg = "Please make sure that you have selected exactly three vertices from the active object (manually vertex by vertex)."
+        else:
+            # Get Vertices
+            if(self.inverse):
+                coord_start = bm.select_history[2].co
+                coord_center = bm.select_history[1].co
+                coord_end = bm.select_history[0].co
+            else:
+                coord_start = bm.select_history[0].co
+                coord_center = bm.select_history[1].co
+                coord_end = bm.select_history[2].co
+            
+            # Get global coordinates
+            coord_start = obj.matrix_world @ coord_start
+            coord_center = obj.matrix_world @ coord_center
+            coord_end = obj.matrix_world @ coord_end
+            
+            # Get coordinates of a vertex on Z-Axis
+            # coord_center to coord_end is Z-Axis so coord_end is a vertex on the Z-Axis
+            coord_z = coord_end
+            
+            # Get coordinates of a vertex on Y-Axis
+            coord_y = (coord_start - coord_center).cross(coord_z - coord_center) + coord_center
+            
+            # Get coordinates of a vertex on X-Axis
+            coord_x = (coord_y - coord_center).cross(coord_z - coord_center) + coord_center
+            
+            # Get vectors
+            vector_x = coord_x - coord_center
+            vector_y = coord_y - coord_center
+            vector_z = coord_z - coord_center
+            
+            vector_x.normalize()
+            vector_y.normalize()
+            vector_z.normalize()
+            
+            # Build matrix
+            matrix = Matrix([
+                [vector_x[0], vector_y[0], vector_z[0]],
+                [vector_x[1], vector_y[1], vector_z[1]],
+                [vector_x[2], vector_y[2], vector_z[2]]
+            ]) 
+            
+            # Set Orientation
+            bpy.ops.transform.select_orientation(orientation="Align")
+            context.scene.transform_orientation_slots[0].custom_orientation.matrix = matrix
+        
+        # Reset modes
+        if(not self.select):
+            bpy.ops.transform.select_orientation(orientation=orientation)
+        use_extend = False
+        for i in range(3):
+            if(i == 0):
+                type = 'VERT'
+            elif(i == 1):
+                type = 'EDGE'
+            else:
+                type = 'FACE'
+            if(selection_mode[i]):
+                bpy.ops.mesh.select_mode(use_extend=use_extend, type=type, action='ENABLE')
+                use_extend=True
+        bpy.ops.object.mode_set(mode=mode)
+        
+        if(error_msg == ""):
+            return {'FINISHED'}
+        
+        self.report({'ERROR'}, error_msg)
+        return {'CANCELLED'}
 
 class AlignToOrientationOperator(bpy.types.Operator):
     """Align selected objects"""
@@ -314,6 +407,17 @@ class OrientationPanel(bpy.types.Panel):
         layout.operator(AlignToVerticesOperator.bl_idname)
         layout.operator(AlignToCurveOperator.bl_idname)
 
+class AnglePanel(bpy.types.Panel):
+    bl_idname = "OBJECT_PT_angle"
+    bl_label = "Angle"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = "Align"
+    
+    def draw(self, context):
+        layout = self.layout
+        layout.label(text="Coming soon!")
+
 
 # # # # # # # # # # # # # # # # # #
 #          Registration           #
@@ -332,6 +436,7 @@ classes = (
     
     # Panels
     OrientationPanel,
+    AnglePanel
     
 )
 
