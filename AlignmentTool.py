@@ -8,7 +8,7 @@ bl_info = {
     "name": "Alignment Tool",
     "description": "Tool for aligning objects and profiles in Blender.",
     "author": "Florian Otten",
-    "version": (0, 4),
+    "version": (0, 5),
     "blender": (2, 82, 0),
     "location": "3D View > Tools",
     "warning": "",
@@ -37,6 +37,20 @@ from math import *
 # # # # # # # # # # # # # # # # # #
 #           Properties            #
 # # # # # # # # # # # # # # # # # #
+
+class AlignProps(bpy.types.PropertyGroup):
+    # Profile (Mesh)
+    mesh_profile: bpy.props.PointerProperty(
+        type = bpy.types.Mesh,
+        name = "Mesh",
+        description = "The profile to be used for the angles"
+    )
+    # Profile (Curve)
+    curve_profile: bpy.props.PointerProperty(
+        type = bpy.types.Curve,
+        name = "Curve",
+        description = "The profile to be used for the angles"
+    )
 
 
 # # # # # # # # # # # # # # # # # #
@@ -384,6 +398,39 @@ class AlignToCurveOperator(bpy.types.Operator):
     def execute(self, context):
         
         return {'FINISHED'}
+    
+class AngleFromMeshOperator(bpy.types.Operator):
+    """Coming soon: Create an angle from a mesh."""
+    bl_idname = "align.angle_from_mesh"
+    bl_label = "from mesh"
+    bl_options = {'REGISTER', 'UNDO'}
+    
+    # Properties
+    
+    # Methods
+    @classmethod
+    def poll(cls, context):
+        return False
+    
+    def execute(self, context):
+        return {'FINISHED'}
+    
+class AngleFromCurveOperator(bpy.types.Operator):
+    """Coming soon: Create an angle from a curve."""
+    bl_idname = "align.angle_from_curve"
+    bl_label = "from curve"
+    bl_options = {'REGISTER', 'UNDO'}
+    
+    # Properties
+    
+    # Methods
+    @classmethod
+    def poll(cls, context):
+        return False
+    
+    def execute(self, context):
+        return {'FINISHED'}
+    
 
 # # # # # # # # # # # # # # # # # #
 #             Panels              #
@@ -416,7 +463,13 @@ class AnglePanel(bpy.types.Panel):
     
     def draw(self, context):
         layout = self.layout
-        layout.label(text="Coming soon!")
+        layout.label(text="Create angle")
+        box = layout.box()
+        box.prop(context.scene.align, "mesh_profile", text="Profile")
+        box.operator(AngleFromMeshOperator.bl_idname)
+        box = layout.box()
+        box.prop(context.scene.align, "curve_profile", text="Profile")
+        box.operator(AngleFromCurveOperator.bl_idname)
 
 
 # # # # # # # # # # # # # # # # # #
@@ -425,6 +478,7 @@ class AnglePanel(bpy.types.Panel):
 
 classes = (
     # Properties
+    AlignProps,
     
     # Operators
     SetOrientationToObjectOperator,
@@ -433,6 +487,8 @@ classes = (
     AlignToObjectOperator,
     AlignToVerticesOperator,
     AlignToCurveOperator,
+    AngleFromMeshOperator,
+    AngleFromCurveOperator,
     
     # Panels
     OrientationPanel,
@@ -447,10 +503,12 @@ def register():
         bpy.utils.register_class(c)
     
     # Set Properties
+    bpy.types.Scene.align = bpy.props.PointerProperty(type = AlignProps)
 
 def unregisert():
     
     # Delete Properties
+    del bpy.types.Scene.align
     
     # Unregister classes
     for c in reversed(classes):
