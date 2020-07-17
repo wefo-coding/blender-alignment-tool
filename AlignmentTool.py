@@ -8,7 +8,7 @@ bl_info = {
     "name": "Alignment Tool",
     "description": "Tool for aligning objects and profiles in Blender.",
     "author": "Florian Otten",
-    "version": (0, 5),
+    "version": (0, 6),
     "blender": (2, 82, 0),
     "location": "3D View > Tools",
     "warning": "",
@@ -32,6 +32,165 @@ from math import *
 # # # # # # # # # # # # # # # # # #
 #            Functions            #
 # # # # # # # # # # # # # # # # # #
+
+def dotproduct(v1, v2):
+    """
+    Hilfsfunktion zum Berechne des Winkels zwischen zwei Vektoren.
+    """
+    return sum((a * b) for a, b in zip(v1, v2))
+
+
+def length(v):
+    """
+    Hilfsfunktion zum Berechne des Winkels zwischen zwei Vektoren.
+    """
+    return math.sqrt(dotproduct(v, v))
+
+
+def angle(v1, v2):
+    """
+    Berechnet den Winkel zwischen zwei Vektoren.
+    """
+    return math.acos(dotproduct(v1, v2) / (length(v1) * length(v2)))
+
+# TODO copied from blender-angles
+def extrudeAngle(angle, inverse=False):
+    """
+    Hilfsfunktion für addAngle.
+    """
+
+    # Speichere aktives Objekt. #
+    obj = bpy.context.object
+
+    # Wechsle in den Edit mode. #
+    bpy.ops.object.mode_set(mode='EDIT')
+
+    # Extrude alles um eine Einheit. #
+    bpy.ops.mesh.select_all(action='SELECT')
+    bpy.ops.mesh.extrude_region_move(
+        TRANSFORM_OT_translate={
+            "value": (0, 0, 1),
+            "constraint_axis": (False, False, True),
+            "orient_type": 'NORMAL'
+        }
+    )
+    bm = bmesh.from_edit_mesh(obj.data)
+    bm.verts.ensure_lookup_table()
+
+    # Die Neuen Punkte auf die Schnittpunkte mit dem Anderen Objekt setzen. #
+    minZ = 0
+    for x in range(0, int(len(bm.verts) / 2)):
+        if inverse:
+            bm.verts[x + int(len(bm.verts) / 2)].co.z = -1 * bm.verts[
+                x].co.x / math.tan(angle)
+            minZ = min(-1 * bm.verts[x + int(len(bm.verts) / 2)].co.z, minZ)
+        else:
+            bm.verts[x + int(len(bm.verts) / 2)].co.z = bm.verts[
+                                                            x].co.x / math.tan(
+                angle)
+            minZ = min(bm.verts[x + int(len(bm.verts) / 2)].co.z, minZ)
+
+    # Die alten Punkte auf Höhe des niedrigsten Punktes setzen. #
+    for x in range(0, int(len(bm.verts) / 2)):
+        bm.verts[x].co.z = -minZ
+
+    # Wechsle in den Object mode. #
+    bpy.ops.object.mode_set(mode='OBJECT')
+
+def add_angle_from_mesh(target, profile):
+    if(target is None):
+        return 'Target can not be None!'
+    if(type(target) is not bpy.types.Object or target.type != 'MESH'):
+        return 'Target must be an object of type Mesh'
+    if(profile is None):
+        return 'Profile can not be None!'
+    if type(profile) is not bpy.types.Mesh:
+        return 'Profile must be a mesh!'
+    
+    bpy.context.view_layer.objects.active = target
+    
+    # Add the first part and align it 
+    profile = profile.copy() # do not edit the original mesh
+    partA = bpy.data.objects.new(profile.name, profile)
+    bpy.context.scene.collection.objects.link(partA)
+    partA.select_set(True)
+    bpy.ops.align.align_to_vertices()
+    matrixA = partA.matrix_world
+    directionA = Vector([matrixA[0][2], matrixA[1][2], matrixA[2][2]])
+    partA.select_set(False)
+    
+    # Add the second part and align it 
+    profile = profile.copy() # do not edit the original mesh
+    partB = bpy.data.objects.new(profile.name, profile)
+    bpy.context.scene.collection.objects.link(partB)
+    partB.select_set(True)
+    bpy.ops.align.align_to_vertices(inverse = True)
+    matrixB = partB.matrix_world
+    directionB = Vector([matrixB[0][2], matrixB[1][2], matrixB[2][2]])
+    bpy.context.view_layer.objects.active = partB
+    
+    piv = bpy.context.scene.tool_settings.transform_pivot_point
+    bpy.context.scene.tool_settings.transform_pivot_point = 'MEDIAN_POINT'
+    
+    bpy.ops.transform.resize(
+        value=(1, -1, 1),
+        orient_type='LOCAL',
+        constraint_axis=(True, False, False)
+    )
+    #TODO copied form blender-angles
+    
+    # Wechsle in den Edit mode. #
+    bpy.ops.object.mode_set(mode='EDIT')
+
+    # Setze alle Z-Werte der Vertices auf 0, um eine Ebene zu haben. #
+    bpy.ops.mesh.select_all(action='SELECT')
+    bpy.ops.transform.resize(
+        value=(1, 1, 0),
+        constraint_axis=(False, False, True),
+        orient_type='LOCAL'
+    )
+    bpy.context.scene.tool_settings.transform_pivot_point = piv
+
+    # Lösche doppelte Vertices. #
+    bpy.ops.mesh.remove_doubles()
+
+    # Berechne Winkel zwischen Objekten. #
+    angleAB = angle(directionA, directionB)
+
+    # Wechsle in den Object mode. #
+    bpy.ops.object.mode_set(mode='OBJECT')
+    
+    # Extrudiere die beiden Teile. #
+    extrudeAngle(angleAB / 2, inverse=True)
+    bpy.context.view_layer.objects.active = partA
+    extrudeAngle(angleAB / 2, inverse=True)
+
+    # Verschmelze die beiden Teile. #
+    bpy.ops.object.select_all(action='DESELECT')
+    partA.select_set(True)
+    partB.select_set(True)
+    bpy.ops.object.join()
+
+    # Wechsle in den Edit mode. #
+    bpy.ops.object.mode_set(mode='EDIT')
+
+    # Entferne doppelte Punkte und innere Fläche. #
+    bpy.ops.mesh.remove_doubles()
+    bpy.ops.mesh.delete(type='FACE')
+    bpy.ops.mesh.select_all(action='SELECT')
+    bpy.ops.mesh.remove_doubles()
+    bpy.ops.mesh.normals_make_consistent(inside=False)
+    bpy.ops.mesh.select_all(action='DESELECT')
+    bpy.ops.mesh.select_non_manifold()
+    bpy.ops.mesh.delete(type='FACE')
+    bpy.ops.mesh.select_all(action='DESELECT')
+
+    # Wechsle in den Object mode. #
+    bpy.ops.object.mode_set(mode='OBJECT')
+    
+    #end of copied part
+    
+    return partA
 
 
 # # # # # # # # # # # # # # # # # #
@@ -281,8 +440,12 @@ class AlignToVerticesOperator(bpy.types.Operator):
     def poll(cls, context):
         return (
             context.active_object is not None and
-            context.active_object.type == 'MESH' and
-            len(context.selected_objects) > 1
+            context.active_object.type == 'MESH' and (
+                len(context.selected_objects) > 1 or (
+                    len(context.selected_objects) == 1 and
+                    not context.active_object.select_get()
+                )
+            )
         )
         
     def execute(self, context):
@@ -410,9 +573,38 @@ class AngleFromMeshOperator(bpy.types.Operator):
     # Methods
     @classmethod
     def poll(cls, context):
-        return False
+        return context.scene.align.mesh_profile is not None
     
     def execute(self, context):
+        profile = context.scene.align.mesh_profile
+        
+        # Store and set modes
+        mode = context.active_object.mode
+        bpy.ops.object.mode_set(mode='OBJECT')
+        
+        msgs = ""
+        agls = []
+        objs = context.selected_objects
+        bpy.ops.object.select_all(action = 'DESELECT')
+        
+        for obj in objs:
+            result = add_angle_from_mesh(obj, profile)
+            if(type(result) is bpy.types.Object):
+                agls.append(result)
+            else:
+                if msgs != "":
+                    msgs += "\n"
+                msgs += result
+        
+        if(msgs != ""):
+            self.report({'WARNING'}, msgs)
+        
+        #for obj in agls:
+        #    obj.select_set(True)
+            
+        # Reset modes
+        #bpy.ops.object.mode_set(mode=mode)
+        
         return {'FINISHED'}
     
 class AngleFromCurveOperator(bpy.types.Operator):
