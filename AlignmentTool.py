@@ -8,7 +8,7 @@ bl_info = {
     "name": "Alignment Tool",
     "description": "Tool for aligning objects and profiles in Blender.",
     "author": "Florian Otten",
-    "version": (0, 6),
+    "version": (0, 7),
     "blender": (2, 82, 0),
     "location": "3D View > Tools",
     "warning": "",
@@ -623,6 +623,36 @@ class AngleFromCurveOperator(bpy.types.Operator):
     def execute(self, context):
         return {'FINISHED'}
     
+class CopyMeshToSelectedOperator(bpy.types.Operator):
+    """Copy the mesh of the active object to all selected objects."""
+    bl_idname = "align.copy_mesh_to_selected"
+    bl_label = "copy mesh to selected"
+    bl_options = {'REGISTER', 'UNDO'}
+    
+    # Methods
+    @classmethod
+    def poll(cls, context):
+        return (
+            context.active_object is not None and
+            context.active_object.type == 'MESH' and (
+                len(context.selected_objects) > 1 or (
+                    len(context.selected_objects) == 1 and
+                    not context.active_object.select_get()
+                )
+            )
+        )
+    
+    def execute(self, context):
+        for obj in context.selected_objects:
+            if(
+                obj != context.active_object and
+                type(obj) is bpy.types.Object and
+                obj.type == 'MESH'
+            ):
+                obj.data = context.active_object.data
+                
+        return {'FINISHED'}
+    
 
 # # # # # # # # # # # # # # # # # #
 #             Panels              #
@@ -662,6 +692,18 @@ class AnglePanel(bpy.types.Panel):
         box = layout.box()
         box.prop(context.scene.align, "curve_profile", text="Profile")
         box.operator(AngleFromCurveOperator.bl_idname)
+        
+class OtherPanel(bpy.types.Panel):
+    bl_idname = "OBJECT_PT_other"
+    bl_label = "Other"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = "Align"
+    
+    def draw(self, context):
+        layout = self.layout
+        layout.operator(CopyMeshToSelectedOperator.bl_idname)
+    
 
 
 # # # # # # # # # # # # # # # # # #
@@ -681,10 +723,12 @@ classes = (
     AlignToCurveOperator,
     AngleFromMeshOperator,
     AngleFromCurveOperator,
+    CopyMeshToSelectedOperator,
     
     # Panels
     OrientationPanel,
-    AnglePanel
+    AnglePanel,
+    OtherPanel
     
 )
 
