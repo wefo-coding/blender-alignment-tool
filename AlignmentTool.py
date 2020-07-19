@@ -276,6 +276,7 @@ class SetOrientationToVerticesOperator(bpy.types.Operator):
         selection_mode = context.tool_settings.mesh_select_mode
         bpy.ops.mesh.select_mode(type='VERT', action='ENABLE')
         selected = obj.select_get()
+        bpy.ops.transform.create_orientation(name = "Align", use = True, overwrite = True)
         orientation = context.scene.transform_orientation_slots[0].type
         
         # Get orientation matrix
